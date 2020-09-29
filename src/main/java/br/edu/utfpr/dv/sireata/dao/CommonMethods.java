@@ -19,6 +19,24 @@ public abstract class CommonMethods<M> {
 
     abstract public String listarParaConsultaAtasQuery(int IdCampus, int idUsuario);
 
+    public M buscar(int id, String query) throws SQLException{
+        try (
+                Connection conn = ConnectionDAO.getInstance().getConnection();
+                PreparedStatement stmt = conn.prepareStatement(query)
+        ) {            stmt.setInt(1, id);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+
+                return
+                        rs.next() ?
+                                this.carregarObjeto(rs)
+                                : null;
+            }
+
+        }
+
+    }
+
     public M buscarPorId(int id) throws SQLException {
         try (
                 Connection conn = ConnectionDAO.getInstance().getConnection();
@@ -31,8 +49,7 @@ public abstract class CommonMethods<M> {
                 return
                         rs.next() ?
                                 this.carregarObjeto(rs)
-                                :
-                                null;
+                                : null;
             }
         }
     }
@@ -53,6 +70,10 @@ public abstract class CommonMethods<M> {
             return list;
         }
     }
+
+    public abstract int inserir(M m) throws SQLException;
+
+    public abstract int atualizar(M m) throws SQLException;
 
     public abstract int salvar(M m) throws SQLException;
 
