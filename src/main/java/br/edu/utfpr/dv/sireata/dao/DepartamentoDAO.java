@@ -3,7 +3,6 @@ package br.edu.utfpr.dv.sireata.dao;
 import br.edu.utfpr.dv.sireata.model.Departamento;
 
 import java.sql.*;
-import java.util.ArrayList;
 import java.util.List;
 
 public class DepartamentoDAO extends CommonMethods<Departamento> {
@@ -50,83 +49,23 @@ public class DepartamentoDAO extends CommonMethods<Departamento> {
     }
 
     public Departamento buscarPorOrgao(int idOrgao) throws SQLException {
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-            stmt = conn.prepareStatement(
-                    "SELECT departamentos.*, campus.nome AS nomeCampus " +
-                            "FROM departamentos INNER JOIN campus ON campus.idCampus=departamentos.idCampus " +
-                            "INNER JOIN orgaos ON orgaos.idDepartamento=departamentos.idDepartamento " +
-                            "WHERE orgaos.idOrgao = ?");
-
-            stmt.setInt(1, idOrgao);
-
-            rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return this.carregarObjeto(rs);
-            } else {
-                return null;
-            }
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
-        }
+        return super.buscar(idOrgao, "SELECT departamentos.*, campus.nome AS nomeCampus " +
+                "FROM departamentos INNER JOIN campus ON campus.idCampus=departamentos.idCampus " +
+                "INNER JOIN orgaos ON orgaos.idDepartamento=departamentos.idDepartamento " +
+                "WHERE orgaos.idOrgao = ?");
     }
 
     public List<Departamento> listarPorCampus(int idCampus, boolean apenasAtivos) throws SQLException {
-        Connection conn = null;
-        Statement stmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-            stmt = conn.createStatement();
-
-            rs = stmt.executeQuery("SELECT DISTINCT departamentos.*, campus.nome AS nomeCampus " +
-                    "FROM departamentos INNER JOIN campus ON campus.idCampus=departamentos.idCampus " +
-                    "WHERE departamentos.idCampus=" + idCampus + (apenasAtivos ? " AND departamentos.ativo=1" : "") + " ORDER BY departamentos.nome");
-
-            List<Departamento> list = new ArrayList<>();
-
-            while (rs.next()) {
-                list.add(this.carregarObjeto(rs));
-            }
-
-            return list;
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
-        }
+        return super.listar("SELECT DISTINCT departamentos.*, campus.nome AS nomeCampus " +
+                "FROM departamentos INNER JOIN campus ON campus.idCampus=departamentos.idCampus " +
+                "WHERE departamentos.idCampus=" + idCampus + (apenasAtivos ? " AND departamentos.ativo=1" : "") + " ORDER BY departamentos.nome");
     }
 
     @Override
-    public int salvar(Departamento departamento) throws SQLException {
-        boolean insert = (departamento.getIdDepartamento() == 0);
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-
-            if (insert) {
-                stmt = conn.prepareStatement("INSERT INTO departamentos(idCampus, nome, logo, ativo, site, nomeCompleto) VALUES(?, ?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
-            } else {
-                stmt = conn.prepareStatement("UPDATE departamentos SET idCampus=?, nome=?, logo=?, ativo=?, site=?, nomeCompleto=? WHERE idDepartamento=?");
-            }
-
+    public int inserir(Departamento departamento) throws SQLException {
+        try (Connection conn = ConnectionDAO.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement("INSERT INTO departamentos(idCampus, nome, logo, ativo, site, nomeCompleto) VALUES(?, ?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS)
+        ) {
             stmt.setInt(1, departamento.getCampus().getIdCampus());
             stmt.setString(2, departamento.getNome());
             if (departamento.getLogo() == null) {
@@ -138,29 +77,44 @@ public class DepartamentoDAO extends CommonMethods<Departamento> {
             stmt.setString(5, departamento.getSite());
             stmt.setString(6, departamento.getNomeCompleto());
 
-            if (!insert) {
-                stmt.setInt(7, departamento.getIdDepartamento());
+            stmt.execute();
+
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) departamento.setIdDepartamento(rs.getInt(1));
             }
+            return departamento.getIdDepartamento();
+        }
+    }
+
+    @Override
+    public int atualizar(Departamento departamento) throws SQLException {
+        try (Connection conn = ConnectionDAO.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement("UPDATE departamentos SET idCampus=?, nome=?, logo=?, ativo=?, site=?, nomeCompleto=? WHERE idDepartamento=?")
+        ) {
+            stmt.setInt(1, departamento.getCampus().getIdCampus());
+            stmt.setString(2, departamento.getNome());
+            if (departamento.getLogo() == null) {
+                stmt.setNull(3, Types.BINARY);
+            } else {
+                stmt.setBytes(3, departamento.getLogo());
+            }
+            stmt.setInt(4, departamento.isAtivo() ? 1 : 0);
+            stmt.setString(5, departamento.getSite());
+            stmt.setString(6, departamento.getNomeCompleto());
+
+            stmt.setInt(7, departamento.getIdDepartamento());
 
             stmt.execute();
 
-            if (insert) {
-                rs = stmt.getGeneratedKeys();
-
-                if (rs.next()) {
-                    departamento.setIdDepartamento(rs.getInt(1));
-                }
-            }
-
             return departamento.getIdDepartamento();
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
         }
+    }
+
+    @Override
+    public int salvar(Departamento departamento) throws SQLException {
+        boolean inserir = (departamento.getIdDepartamento() == 0);
+
+        return inserir ? inserir(departamento) : atualizar(departamento);
     }
 
     @Override
