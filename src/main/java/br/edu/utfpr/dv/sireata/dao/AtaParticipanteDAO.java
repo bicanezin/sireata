@@ -39,21 +39,10 @@ public class AtaParticipanteDAO extends CommonMethods<AtaParticipante> {
     }
 
     @Override
-    public int salvar(AtaParticipante participante) throws SQLException {
-        boolean insert = (participante.getIdAtaParticipante() == 0);
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-
-            if (insert) {
-                stmt = conn.prepareStatement("INSERT INTO ataparticipantes(idAta, idUsuario, presente, motivo, designacao, membro) VALUES(?, ?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
-            } else {
-                stmt = conn.prepareStatement("UPDATE ataparticipantes SET idAta=?, idUsuario=?, presente=?, motivo=?, designacao=?, membro=? WHERE idAtaParticipante=?");
-            }
-
+    public int inserir(AtaParticipante participante) throws SQLException {
+        try (Connection conn = ConnectionDAO.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement("INSERT INTO ataparticipantes(idAta, idUsuario, presente, motivo, designacao, membro) VALUES(?, ?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS)
+        ) {
             stmt.setInt(1, participante.getAta().getIdAta());
             stmt.setInt(2, participante.getParticipante().getIdUsuario());
             stmt.setInt(3, (participante.isPresente() ? 1 : 0));
@@ -61,29 +50,39 @@ public class AtaParticipanteDAO extends CommonMethods<AtaParticipante> {
             stmt.setString(5, participante.getDesignacao());
             stmt.setInt(6, (participante.isMembro() ? 1 : 0));
 
-            if (!insert) {
-                stmt.setInt(7, participante.getIdAtaParticipante());
-            }
-
             stmt.execute();
 
-            if (insert) {
-                rs = stmt.getGeneratedKeys();
-
-                if (rs.next()) {
-                    participante.setIdAtaParticipante(rs.getInt(1));
-                }
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) participante.setIdAtaParticipante(rs.getInt(1));
             }
+            return participante.getIdAtaParticipante();
+        }
+    }
+
+    @Override
+    public int atualizar(AtaParticipante participante) throws SQLException {
+        try (Connection conn = ConnectionDAO.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement("UPDATE ataparticipantes SET idAta=?, idUsuario=?, presente=?, motivo=?, designacao=?, membro=? WHERE idAtaParticipante=?")
+        ) {
+            stmt.setInt(1, participante.getAta().getIdAta());
+            stmt.setInt(2, participante.getParticipante().getIdUsuario());
+            stmt.setInt(3, (participante.isPresente() ? 1 : 0));
+            stmt.setString(4, participante.getMotivo());
+            stmt.setString(5, participante.getDesignacao());
+            stmt.setInt(6, (participante.isMembro() ? 1 : 0));
+
+            stmt.setInt(7, participante.getIdAtaParticipante());
+            stmt.execute();
 
             return participante.getIdAtaParticipante();
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
         }
+    }
+
+    @Override
+    public int salvar(AtaParticipante participante) throws SQLException {
+        boolean inserir = (participante.getIdAtaParticipante() == 0);
+
+        return inserir ? inserir(participante) : atualizar(participante);
     }
 
     @Override
