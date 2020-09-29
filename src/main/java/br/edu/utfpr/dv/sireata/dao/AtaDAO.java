@@ -383,7 +383,7 @@ public class AtaDAO extends CommonMethods<Ata> {
     public boolean excluir(int idAta) throws SQLException {
         try
                 (Connection conn = ConnectionDAO.getInstance().getConnection();
-                 onn.setAutoCommit(false);
+                 conn.setAutoCommit(false);
                  Statement stmt = conn.createStatement()) {
 
             stmt.execute("DELETE FROM comentarios WHERE idPauta IN (SELECT idPauta FROM pautas WHERE idAta=" + idAta + ")");
