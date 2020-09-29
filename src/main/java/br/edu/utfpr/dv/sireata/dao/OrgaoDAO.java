@@ -62,22 +62,18 @@ public class OrgaoDAO extends CommonMethods<Orgao> {
     }
 
     public List<Orgao> listarPorCampus(int idCampus) throws SQLException {
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-            stmt = conn.prepareStatement(
-                    "SELECT DISTINCT orgaos.*, p.nome AS presidente, s.nome AS secretario, departamentos.nome AS departamento FROM orgaos " +
-                            "INNER JOIN departamentos ON departamentos.iddepartamento=orgaos.iddepartamento " +
-                            "INNER JOIN usuarios p ON p.idusuario=orgaos.idpresidente " +
-                            "INNER JOIN usuarios s ON s.idusuario=orgaos.idsecretario " +
-                            "WHERE departamentos.idCampus = ? ORDER BY departamentos.nome, orgaos.nome");
+        try
+                (Connection conn = ConnectionDAO.getInstance().getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(
+                         "SELECT DISTINCT orgaos.*, p.nome AS presidente, s.nome AS secretario, departamentos.nome AS departamento FROM orgaos " +
+                                 "INNER JOIN departamentos ON departamentos.iddepartamento=orgaos.iddepartamento " +
+                                 "INNER JOIN usuarios p ON p.idusuario=orgaos.idpresidente " +
+                                 "INNER JOIN usuarios s ON s.idusuario=orgaos.idsecretario " +
+                                 "WHERE departamentos.idCampus = ? ORDER BY departamentos.nome, orgaos.nome")) {
 
             stmt.setInt(1, idCampus);
 
-            rs = stmt.executeQuery();
+            ResultSet rs = stmt.executeQuery();
 
             List<Orgao> list = new ArrayList<>();
 
@@ -86,121 +82,65 @@ public class OrgaoDAO extends CommonMethods<Orgao> {
             }
 
             return list;
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
         }
     }
 
     public Usuario buscarPresidente(int idOrgao) throws SQLException {
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-            stmt = conn.prepareStatement(
-                    "SELECT idPresidente FROM orgaos WHERE idOrgao = ?");
+        try
+                (Connection conn = ConnectionDAO.getInstance().getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(
+                         "SELECT idPresidente FROM orgaos WHERE idOrgao = ?")) {
 
             stmt.setInt(1, idOrgao);
 
-            rs = stmt.executeQuery();
+            ResultSet rs = stmt.executeQuery();
 
-            if (rs.next()) {
-                UsuarioDAO dao = new UsuarioDAO();
-
-                return dao.buscarPorId(rs.getInt("idPresidente"));
-            } else {
-                return null;
-            }
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
+            UsuarioDAO dao = new UsuarioDAO();
+            return rs.next() ?
+                    dao.buscarPorId(rs.getInt("idPresidente")) :
+                    null;
         }
     }
 
     public Usuario buscarSecretario(int idOrgao) throws SQLException {
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
 
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-            stmt = conn.prepareStatement(
-                    "SELECT idSecretario FROM orgaos WHERE idOrgao = ?");
+        try
+                (Connection conn = ConnectionDAO.getInstance().getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(
+                         "SELECT idSecretario FROM orgaos WHERE idOrgao = ?")) {
 
             stmt.setInt(1, idOrgao);
 
-            rs = stmt.executeQuery();
+            ResultSet rs = stmt.executeQuery();
 
-            if (rs.next()) {
-                UsuarioDAO dao = new UsuarioDAO();
-
-                return dao.buscarPorId(rs.getInt("idSecretario"));
-            } else {
-                return null;
-            }
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
+            UsuarioDAO dao = new UsuarioDAO();
+            return rs.next() ?
+                    dao.buscarPorId(rs.getInt("idSecretario")) :
+                    null;
         }
     }
 
     public boolean isMembro(int idOrgao, int idUsuario) throws SQLException {
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-            stmt = conn.prepareStatement(
-                    "SELECT * FROM membros WHERE idOrgao = ? AND idUsuario=?");
+        try
+                (Connection conn = ConnectionDAO.getInstance().getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(
+                         "SELECT * FROM membros WHERE idOrgao = ? AND idUsuario=?")) {
 
             stmt.setInt(1, idOrgao);
             stmt.setInt(2, idUsuario);
 
-            rs = stmt.executeQuery();
+            ResultSet rs = stmt.executeQuery();
 
             return rs.next();
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
         }
     }
 
     @Override
-    public int salvar(Orgao orgao) throws SQLException {
-        boolean insert = (orgao.getIdOrgao() == 0);
-        Connection conn = null;
-        PreparedStatement stmt;
-        ResultSet rs;
-
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
+    public int inserir(Orgao orgao) throws SQLException {
+        try (Connection conn = ConnectionDAO.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement("INSERT INTO orgaos(idDepartamento, idPresidente, idSecretario, nome, nomeCompleto, designacaoPresidente, ativo) VALUES(?, ?, ?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS)
+        ) {
             conn.setAutoCommit(false);
-
-            if (insert) {
-                stmt = conn.prepareStatement("INSERT INTO orgaos(idDepartamento, idPresidente, idSecretario, nome, nomeCompleto, designacaoPresidente, ativo) VALUES(?, ?, ?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
-            } else {
-                stmt = conn.prepareStatement("UPDATE orgaos SET idDepartamento=?, idPresidente=?, idSecretario=?, nome=?, nomeCompleto=?, designacaoPresidente=?, ativo=? WHERE idOrgao=?");
-            }
-
             stmt.setInt(1, orgao.getDepartamento().getIdDepartamento());
             stmt.setInt(2, orgao.getPresidente().getIdUsuario());
             stmt.setInt(3, orgao.getSecretario().getIdUsuario());
@@ -209,18 +149,8 @@ public class OrgaoDAO extends CommonMethods<Orgao> {
             stmt.setString(6, orgao.getDesignacaoPresidente());
             stmt.setInt(7, (orgao.isAtivo() ? 1 : 0));
 
-            if (!insert) {
-                stmt.setInt(8, orgao.getIdOrgao());
-            }
-
-            stmt.execute();
-
-            if (insert) {
-                rs = stmt.getGeneratedKeys();
-
-                if (rs.next()) {
-                    orgao.setIdOrgao(rs.getInt(1));
-                }
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) orgao.setIdOrgao(rs.getInt(1));
             }
 
             stmt = conn.prepareStatement("DELETE FROM membros WHERE idOrgao=" + orgao.getIdOrgao());
@@ -239,15 +169,56 @@ public class OrgaoDAO extends CommonMethods<Orgao> {
             conn.commit();
 
             return orgao.getIdOrgao();
+        }
+    }
+
+    @Override
+    public int atualizar(Orgao orgao) throws SQLException {
+        try (Connection conn = ConnectionDAO.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement("UPDATE orgaos SET idDepartamento=?, idPresidente=?, idSecretario=?, nome=?, nomeCompleto=?, designacaoPresidente=?, ativo=? WHERE idOrgao=?")
+        ) {
+            conn.setAutoCommit(false);
+
+            stmt.setInt(1, orgao.getDepartamento().getIdDepartamento());
+            stmt.setInt(2, orgao.getPresidente().getIdUsuario());
+            stmt.setInt(3, orgao.getSecretario().getIdUsuario());
+            stmt.setString(4, orgao.getNome());
+            stmt.setString(5, orgao.getNomeCompleto());
+            stmt.setString(6, orgao.getDesignacaoPresidente());
+            stmt.setInt(7, (orgao.isAtivo() ? 1 : 0));
+
+            stmt.setInt(8, orgao.getIdOrgao());
+
+            stmt = conn.prepareStatement("DELETE FROM membros WHERE idOrgao=" + orgao.getIdOrgao());
+            stmt.execute();
+
+            for (OrgaoMembro u : orgao.getMembros()) {
+                stmt = conn.prepareStatement("INSERT INTO membros(idOrgao, idUsuario, designacao) VALUES(?, ?, ?)");
+
+                stmt.setInt(1, orgao.getIdOrgao());
+                stmt.setInt(2, u.getUsuario().getIdUsuario());
+                stmt.setString(3, u.getDesignacao());
+
+                stmt.execute();
+            }
+
+            conn.commit();
+
+            return orgao.getIdOrgao();
         } catch (SQLException e) {
-            assert conn != null;
+            Connection conn = null;
+            assert false;
             conn.rollback();
 
             throw e;
-        } finally {
-            assert conn != null;
-            conn.setAutoCommit(true);
         }
+    }
+
+    @Override
+    public int salvar(Orgao orgao) throws SQLException {
+        boolean inserir = (orgao.getIdOrgao() == 0);
+
+        return inserir ? inserir(orgao) : atualizar(orgao);
     }
 
     @Override
