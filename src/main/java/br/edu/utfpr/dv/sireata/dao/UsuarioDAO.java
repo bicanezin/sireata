@@ -36,58 +36,28 @@ public class UsuarioDAO extends CommonMethods<Usuario> {
     }
 
     public Usuario buscarPorLogin(String login) throws SQLException {
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-            stmt = conn.prepareStatement("SELECT * FROM usuarios WHERE login = ?");
+        try
+                (Connection conn = ConnectionDAO.getInstance().getConnection();
+                 PreparedStatement stmt = conn.prepareStatement("SELECT * FROM usuarios WHERE login = ?")) {
 
             stmt.setString(1, login);
 
-            rs = stmt.executeQuery();
+            ResultSet rs = stmt.executeQuery();
 
-            if (rs.next()) {
-                return this.carregarObjeto(rs);
-            } else {
-                return null;
-            }
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
+            return rs.next() ? this.carregarObjeto(rs) : null;
         }
     }
 
     public String buscarEmail(int id) throws SQLException {
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-            stmt = conn.prepareStatement("SELECT email FROM usuarios WHERE idUsuario = ?");
+        try
+                (Connection conn = ConnectionDAO.getInstance().getConnection();
+                 PreparedStatement stmt = conn.prepareStatement("SELECT email FROM usuarios WHERE idUsuario = ?")) {
 
             stmt.setInt(1, id);
 
-            rs = stmt.executeQuery();
+            ResultSet rs = stmt.executeQuery();
 
-            if (rs.next()) {
-                return rs.getString("email");
-            } else {
-                return "";
-            }
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
+            return rs.next() ? rs.getString("email") : "";
         }
     }
 
@@ -97,19 +67,16 @@ public class UsuarioDAO extends CommonMethods<Usuario> {
                 (apenasAtivos ? " AND ativo = 1 " : "") +
                 (apenasExternos ? " AND externo = 1 " : "") +
                 "ORDER BY nome";
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
 
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-            stmt = conn.prepareStatement(sql);
-
+        try
+                (Connection conn = ConnectionDAO.getInstance().getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)
+                ) {
             if (!nome.isEmpty()) {
                 stmt.setString(1, "%" + nome + "%");
             }
 
-            rs = stmt.executeQuery();
+            ResultSet rs = stmt.executeQuery();
             List<Usuario> list = new ArrayList<>();
 
             while (rs.next()) {
@@ -117,32 +84,14 @@ public class UsuarioDAO extends CommonMethods<Usuario> {
             }
 
             return list;
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
         }
     }
 
     @Override
-    public int salvar(Usuario usuario) throws SQLException {
-        boolean insert = (usuario.getIdUsuario() == 0);
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-
-            if (insert) {
-                stmt = conn.prepareStatement("INSERT INTO usuarios(nome, login, senha, email, externo, ativo, administrador) VALUES(?, ?, ?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
-            } else {
-                stmt = conn.prepareStatement("UPDATE usuarios SET nome=?, login=?, senha=?, email=?, externo=?, ativo=?, administrador=? WHERE idUsuario=?");
-            }
-
+    public int inserir(Usuario usuario) throws SQLException {
+        try (Connection conn = ConnectionDAO.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement("INSERT INTO usuarios(nome, login, senha, email, externo, ativo, administrador) VALUES(?, ?, ?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS)
+        ) {
             stmt.setString(1, usuario.getNome());
             stmt.setString(2, usuario.getLogin());
             stmt.setString(3, usuario.getSenha());
@@ -151,29 +100,40 @@ public class UsuarioDAO extends CommonMethods<Usuario> {
             stmt.setInt(6, usuario.isAtivo() ? 1 : 0);
             stmt.setInt(7, usuario.isAdministrador() ? 1 : 0);
 
-            if (!insert) {
-                stmt.setInt(8, usuario.getIdUsuario());
-            }
-
             stmt.execute();
 
-            if (insert) {
-                rs = stmt.getGeneratedKeys();
-
-                if (rs.next()) {
-                    usuario.setIdUsuario(rs.getInt(1));
-                }
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) usuario.setIdUsuario(rs.getInt(1));
             }
+            return usuario.getIdUsuario();
+        }
+    }
+
+    @Override
+    public int atualizar(Usuario usuario) throws SQLException {
+        try (Connection conn = ConnectionDAO.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement("UPDATE usuarios SET nome=?, login=?, senha=?, email=?, externo=?, ativo=?, administrador=? WHERE idUsuario=?")
+        ) {
+            stmt.setString(1, usuario.getNome());
+            stmt.setString(2, usuario.getLogin());
+            stmt.setString(3, usuario.getSenha());
+            stmt.setString(4, usuario.getEmail());
+            stmt.setInt(5, usuario.isExterno() ? 1 : 0);
+            stmt.setInt(6, usuario.isAtivo() ? 1 : 0);
+            stmt.setInt(7, usuario.isAdministrador() ? 1 : 0);
+
+            stmt.setInt(8, usuario.getIdUsuario());
+            stmt.execute();
 
             return usuario.getIdUsuario();
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
         }
+    }
+
+    @Override
+    public int salvar(Usuario usuario) throws SQLException {
+        boolean inserir = (usuario.getIdUsuario() == 0);
+
+        return inserir ? inserir(usuario) : atualizar(usuario);
     }
 
     @Override
@@ -204,57 +164,31 @@ public class UsuarioDAO extends CommonMethods<Usuario> {
 
         if (!sql.toString().equals("")) { // troca o != para o .equals()
             List<String> emails = new ArrayList<>();
-            Connection conn = null;
-            Statement stmt = null;
-            ResultSet rs = null;
 
-            try {
-                conn = ConnectionDAO.getInstance().getConnection();
-                stmt = conn.createStatement();
+            try
+                    (Connection conn = ConnectionDAO.getInstance().getConnection();
+                     Statement stmt = conn.createStatement();
 
-                rs = stmt.executeQuery("SELECT email FROM usuarios WHERE idUsuario IN (" + sql + ")");
-
+                     ResultSet rs = stmt.executeQuery("SELECT email FROM usuarios WHERE idUsuario IN (" + sql + ")")) {
                 while (rs.next()) {
                     emails.add(rs.getString("email"));
                 }
 
                 return (String[]) emails.toArray();
-            } finally {
-                if ((rs != null) && !rs.isClosed())
-                    rs.close();
-                if ((stmt != null) && !stmt.isClosed())
-                    stmt.close();
-                if ((conn != null) && !conn.isClosed())
-                    conn.close();
             }
         } else
             return null;
     }
 
     public boolean podeCriarAta(int idUsuario) throws SQLException {
-        Connection conn = null;
-        Statement stmt = null;
-        ResultSet rs = null;
+        try
+                (Connection conn = ConnectionDAO.getInstance().getConnection();
+                 Statement stmt = conn.createStatement();
 
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-            stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery("SELECT COUNT(orgaos.idOrgao) AS qtde FROM orgaos " +
+                         "WHERE idPresidente=" + idUsuario + " OR idSecretario=" + idUsuario)) {
 
-            rs = stmt.executeQuery("SELECT COUNT(orgaos.idOrgao) AS qtde FROM orgaos " +
-                    "WHERE idPresidente=" + idUsuario + " OR idSecretario=" + idUsuario);
-
-            if (rs.next()) {
-                return (rs.getInt("qtde") > 0);
-            } else {
-                return false;
-            }
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
+            return rs.next() && rs.getInt("qtde") > 0;
         }
     }
 
