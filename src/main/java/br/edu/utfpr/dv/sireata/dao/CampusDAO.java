@@ -3,7 +3,6 @@ package br.edu.utfpr.dv.sireata.dao;
 import br.edu.utfpr.dv.sireata.model.Campus;
 
 import java.sql.*;
-import java.util.ArrayList;
 import java.util.List;
 
 public class CampusDAO extends CommonMethods<Campus> {
@@ -36,49 +35,29 @@ public class CampusDAO extends CommonMethods<Campus> {
     }
 
     public Campus buscarPorDepartamento(int idDepartamento) throws SQLException {
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
 
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-            stmt = conn.prepareStatement("SELECT idCampus FROM departamentos WHERE idDepartamento=?");
+        try
+                (Connection conn = ConnectionDAO.getInstance().getConnection();
+                 PreparedStatement stmt = conn.prepareStatement("SELECT idCampus FROM departamentos WHERE idDepartamento=?")) {
 
             stmt.setInt(1, idDepartamento);
 
-            rs = stmt.executeQuery();
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next() ?
+                        this.buscarPorId(rs.getInt("idCampus"))
+                        : null;
 
-            if (rs.next()) {
-                return this.buscarPorId(rs.getInt("idCampus"));
-            } else {
-                return null;
             }
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
+
+
         }
     }
 
     @Override
-    public int salvar(Campus campus) throws SQLException {
-        boolean insert = (campus.getIdCampus() == 0);
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-
-            if (insert) {
-                stmt = conn.prepareStatement("INSERT INTO campus(nome, endereco, logo, ativo, site) VALUES(?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
-            } else {
-                stmt = conn.prepareStatement("UPDATE campus SET nome=?, endereco=?, logo=?, ativo=?, site=? WHERE idCampus=?");
-            }
-
+    public int inserir(Campus campus) throws SQLException {
+        try (Connection conn = ConnectionDAO.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement("INSERT INTO campus(nome, endereco, logo, ativo, site) VALUES(?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS)
+        ) {
             stmt.setString(1, campus.getNome());
             stmt.setString(2, campus.getEndereco());
             if (campus.getLogo() == null) {
@@ -89,29 +68,42 @@ public class CampusDAO extends CommonMethods<Campus> {
             stmt.setInt(4, campus.isAtivo() ? 1 : 0);
             stmt.setString(5, campus.getSite());
 
-            if (!insert) {
-                stmt.setInt(6, campus.getIdCampus());
-            }
-
             stmt.execute();
 
-            if (insert) {
-                rs = stmt.getGeneratedKeys();
-
-                if (rs.next()) {
-                    campus.setIdCampus(rs.getInt(1));
-                }
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) campus.setIdCampus(rs.getInt(1));
             }
+            return campus.getIdCampus();
+        }
+    }
+
+    @Override
+    public int atualizar(Campus campus) throws SQLException {
+        try (Connection conn = ConnectionDAO.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement("UPDATE campus SET nome=?, endereco=?, logo=?, ativo=?, site=? WHERE idCampus=?")
+        ) {
+            stmt.setString(1, campus.getNome());
+            stmt.setString(2, campus.getEndereco());
+            if (campus.getLogo() == null) {
+                stmt.setNull(3, Types.BINARY);
+            } else {
+                stmt.setBytes(3, campus.getLogo());
+            }
+            stmt.setInt(4, campus.isAtivo() ? 1 : 0);
+            stmt.setString(5, campus.getSite());
+
+            stmt.setInt(6, campus.getIdCampus());
+            stmt.execute();
 
             return campus.getIdCampus();
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
         }
+    }
+
+    @Override
+    public int salvar(Campus campus) throws SQLException {
+        boolean inserir = (campus.getIdCampus() == 0);
+
+        return inserir ? inserir(campus) : atualizar(campus);
     }
 
     @Override
@@ -129,68 +121,20 @@ public class CampusDAO extends CommonMethods<Campus> {
     }
 
     public List<Campus> listarParaCriacaoAta(int idUsuario) throws SQLException {
-        Connection conn = null;
-        Statement stmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-            stmt = conn.createStatement();
-
-            rs = stmt.executeQuery("SELECT DISTINCT campus.* FROM campus " +
-                    "INNER JOIN departamentos ON departamentos.idCampus=campus.idCampus " +
-                    "INNER JOIN orgaos ON orgaos.idDepartamento=departamentos.idDepartamento " +
-                    "WHERE campus.ativo=1 AND (orgaos.idPresidente=" + idUsuario + " OR orgaos.idSecretario=" + idUsuario +
-                    ") ORDER BY campus.nome");
-
-            List<Campus> list = new ArrayList<>();
-
-            while (rs.next()) {
-                list.add(this.carregarObjeto(rs));
-            }
-
-            return list;
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
-        }
+        return super.listar("SELECT DISTINCT campus.* FROM campus " +
+                "INNER JOIN departamentos ON departamentos.idCampus=campus.idCampus " +
+                "INNER JOIN orgaos ON orgaos.idDepartamento=departamentos.idDepartamento " +
+                "WHERE campus.ativo=1 AND (orgaos.idPresidente=" + idUsuario + " OR orgaos.idSecretario=" + idUsuario +
+                ") ORDER BY campus.nome");
     }
 
     public List<Campus> listarParaConsultaAtas(int idUsuario) throws SQLException {
-        Connection conn = null;
-        Statement stmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = ConnectionDAO.getInstance().getConnection();
-            stmt = conn.createStatement();
-
-            rs = stmt.executeQuery("SELECT DISTINCT campus.* FROM campus " +
-                    "INNER JOIN departamentos ON departamentos.idCampus=campus.idCampus " +
-                    "INNER JOIN orgaos ON orgaos.idDepartamento=departamentos.idDepartamento " +
-                    "INNER JOIN atas ON atas.idOrgao=orgaos.idOrgao " +
-                    "INNER JOIN ataParticipantes ON ataParticipantes.idAta=atas.idAta " +
-                    "WHERE atas.publicada=0 AND ataParticipantes.presente=1 AND ataParticipantes.idUsuario=" + idUsuario +
-                    " ORDER BY campus.nome");
-
-            List<Campus> list = new ArrayList<>();
-
-            while (rs.next()) {
-                list.add(this.carregarObjeto(rs));
-            }
-
-            return list;
-        } finally {
-            if ((rs != null) && !rs.isClosed())
-                rs.close();
-            if ((stmt != null) && !stmt.isClosed())
-                stmt.close();
-            if ((conn != null) && !conn.isClosed())
-                conn.close();
-        }
+        return super.listar("SELECT DISTINCT campus.* FROM campus " +
+                "INNER JOIN departamentos ON departamentos.idCampus=campus.idCampus " +
+                "INNER JOIN orgaos ON orgaos.idDepartamento=departamentos.idDepartamento " +
+                "INNER JOIN atas ON atas.idOrgao=orgaos.idOrgao " +
+                "INNER JOIN ataParticipantes ON ataParticipantes.idAta=atas.idAta " +
+                "WHERE atas.publicada=0 AND ataParticipantes.presente=1 AND ataParticipantes.idUsuario=" + idUsuario +
+                " ORDER BY campus.nome");
     }
 }
