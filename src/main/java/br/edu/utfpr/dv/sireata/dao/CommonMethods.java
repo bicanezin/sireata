@@ -19,11 +19,12 @@ public abstract class CommonMethods<M> {
 
     abstract public String listarParaConsultaAtasQuery(int IdCampus, int idUsuario);
 
-    public M buscar(int id, String query) throws SQLException{
+    public M buscar(int id, String query) throws SQLException {
         try (
                 Connection conn = ConnectionDAO.getInstance().getConnection();
                 PreparedStatement stmt = conn.prepareStatement(query)
-        ) {            stmt.setInt(1, id);
+        ) {
+            stmt.setInt(1, id);
 
             try (ResultSet rs = stmt.executeQuery()) {
 
@@ -51,6 +52,22 @@ public abstract class CommonMethods<M> {
                                 this.carregarObjeto(rs)
                                 : null;
             }
+        }
+    }
+
+    public List<M> listar(String query) throws SQLException {
+        try
+                (Connection conn = ConnectionDAO.getInstance().getConnection();
+                 Statement stmt = conn.createStatement();
+
+                 ResultSet rs = stmt.executeQuery(query)) {
+            List<M> list = new ArrayList<>();
+
+            while (rs.next()) {
+                list.add(this.carregarObjeto(rs));
+            }
+
+            return list;
         }
     }
 
